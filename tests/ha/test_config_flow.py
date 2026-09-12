@@ -3236,3 +3236,116 @@ class TestEveryStepSuppliesItsOwnPlaceholders:
                 assert f'"{token}"' in sources, (
                     f"{step} uses {{{token}}} and no config flow passes it"
                 )
+
+
+class TestSecretFieldsAreMasked:
+    """The EcoFlow secret key and the app password must never render as plain text.
+
+    Both fields used to be typed as ``str``, which the frontend renders as an
+    unmasked text input - the value is visible while the user types it and in
+    any screen share or over-the-shoulder view during setup. PLAN-141 replaced
+    both with a password :class:`TextSelector` at all ten call sites across
+    the four config-flow files.
+    """
+
+    def test_every_secret_and_password_field_uses_a_password_selector(self) -> None:
+        """Every ``CONF_SECRET_KEY``/``CONF_PASSWORD`` schema entry is masked.
+
+        Kept as a grep across the source rather than driving every step
+        through a running flow, because the point is exhaustive coverage of
+        the schema *definitions* - including the reauth and reconfigure
+        secret-key field, which no other test in this file drives - not
+        coverage of one runtime path to reach them.
+
+        The grep alone only proves a site *names* a password selector, not
+        that the name resolves to one at runtime - a `_PASSWORD_SELECTOR`
+        constant reassigned to `str`, or built with `TextSelectorType.TEXT`,
+        would still read as a password selector by name (PLAN-141 review
+        finding 2). So every module that had a match is also imported and
+        its `_PASSWORD_SELECTOR` constant is checked directly.
+
+        The regex allows the field name and the closing paren to be on
+        separate lines - the shape `CONF_ACCESS_KEY`/`CONF_EMAIL` already use
+        elsewhere in these files with a `default=...` clause - even though no
+        current `CONF_SECRET_KEY`/`CONF_PASSWORD` site is written that way
+        (finding 3): a future site in that form must still be caught.
+        """
+        import importlib
+        import re
+        from pathlib import Path
+
+        from homeassistant.helpers.selector import TextSelector
+
+        pattern = re.compile(
+            r"vol\.Required\(\s*(CONF_SECRET_KEY|CONF_PASSWORD)\b[^:]*?\)\s*:\s*([^,\n]+)",
+            re.DOTALL,
+        )
+        sources = {
+            path: path.read_text()
+            for path in Path("custom_components/ecoflow_energy").glob("config_flow*.py")
+        }
+        matches: list[tuple[Path, str, str]] = []
+        for path, text in sources.items():
+            for field, validator in pattern.findall(text):
+                matches.append((path, field, validator.strip()))
+
+        # Positive control: PLAN-141 names exactly ten sites across four
+        # files. Fewer means the walk missed a file, or the pattern no
+        # longer matches the code - either way this test would otherwise
+        # pass while checking nothing.
+        assert len(matches) >= 10, (
+            f"found only {len(matches)} CONF_SECRET_KEY/CONF_PASSWORD sites "
+            "(expected at least 10) - the walk or the pattern is broken"
+        )
+
+        for path, field, validator in matches:
+            assert validator != "str", (
+                f"{path.name}: {field} is still a plain str input and renders unmasked"
+            )
+            assert (
+                "TextSelectorType.PASSWORD" in validator
+                or "_PASSWORD_SELECTOR" in validator
+            ), f"{path.name}: {field} uses {validator!r}, not a password selector"
+
+        for path in {path for path, _, _ in matches}:
+            mod = importlib.import_module(
+                f"custom_components.ecoflow_energy.{path.stem}"
+            )
+            selector = mod._PASSWORD_SELECTOR
+            assert isinstance(selector, TextSelector), (
+                f"{path.name}: _PASSWORD_SELECTOR is {selector!r}, not a TextSelector"
+            )
+            assert selector.config["type"] == "password", (
+                f"{path.name}: _PASSWORD_SELECTOR type is "
+                f"{selector.config['type']!r}, not 'password'"
+            )
+
+    async def test_developer_and_app_credential_steps_render_password_selectors(
+        self, hass: HomeAssistant
+    ) -> None:
+        """The two steps reachable through a live flow mask their secret field.
+
+        Complements the source-level grep above with the same check HA
+        itself performs when rendering the form: the schema key's validator
+        must actually be a password :class:`TextSelector` instance, not just
+        text that mentions one.
+        """
+        from homeassistant.helpers.selector import TextSelector
+
+        developer_result = await _select_mode(hass, MODE_STANDARD)
+        assert developer_result["step_id"] == "developer"
+
+        app_result = await _select_mode(hass, MODE_ENHANCED)
+        assert app_result["step_id"] == "app_credentials"
+
+        for result, conf_key in (
+            (developer_result, CONF_SECRET_KEY),
+            (app_result, CONF_PASSWORD),
+        ):
+            schema = result["data_schema"].schema
+            marker = next(
+                key for key in schema if getattr(key, "schema", None) == conf_key
+            )
+            validator = schema[marker]
+            assert isinstance(validator, TextSelector)
+            assert validator.config["type"] == "password"
