@@ -373,7 +373,19 @@ _ZERO_FILL_PATHS: dict[tuple[int, int], tuple[str, ...]] = {
     ),
 }
 
-# The same rule inside one `f50.1` entry, applied per entry.
+# The same rule inside one `f50.1` entry, applied per entry, and checked
+# against the entry's own total (PLAN-145). On the unit's own copy an absent
+# string is an idle string: on every daylight entry on file that misses one
+# (8 of 8 across two ES21 captures) the present strings sum to `.3` exactly,
+# and the app showed 0 W for the missing one. On the copy a neighbour relays
+# it is not always so: the linked pair's 07:36:38 frame carries entry 2 with
+# `.3` = 239 and `.9`/`.10`/`.11` = 72 / 71 / 74, no `.12` at all, so the
+# fourth string was producing about 22 W and simply left out of that frame.
+# Filling it to 0 there would publish 0 W for a live string. The total is the
+# discriminator: an absent string is filled to 0 only while the present ones
+# account for `.3` within `_PV_TOTAL_SLACK_W`, the rounding the relayed copy
+# carries (1 to 2 W on all 14 relayed entries with four strings, 0.0 on the
+# own copy); otherwise the key stays out and the sensor keeps its reading.
 #
 # The entry arrives on every unit, with or without PV, so filling on it
 # hands a PV-less ES22 five keys reading 0 W. That is what
@@ -382,7 +394,9 @@ _ZERO_FILL_PATHS: dict[tuple[int, int], tuple[str, ...]] = {
 # entry rather than on `.3` is what closes the night: at 22:15 and again at
 # 00:27 the capture carries `f50.1` with neither `.3` nor a string in it, in
 # a full get-all as well as in a delta, so keying the fill on `.3` would
-# leave all five holding their last daylight reading until dawn.
+# leave all five holding their last daylight reading until dawn. The same
+# 00:25 and 04:14 night frames of the linked-pair capture carry neither `.3`
+# nor a string on either serial and must still fill all five to 0.
 _PV_ZERO_FILL_PATHS: tuple[str, ...] = (
     "50.1.3",
     "50.1.9",
@@ -390,6 +404,12 @@ _PV_ZERO_FILL_PATHS: tuple[str, ...] = (
     "50.1.11",
     "50.1.12",
 )
+# How far `.3` may sit from the sum of the strings present before an absent
+# string stops being read as idle. Measured on the relayed copy of a linked
+# pair: 1 W or 2 W on every entry that carries all four (14 of 14), 22 W on
+# the two entries that dropped a live string.
+_PV_TOTAL_SLACK_W = 2.5
+_PV_TOTAL_KEY = "pv_total_w"
 
 # The same rule inside one task, applied per task rather than per frame: a
 # container in one task says nothing about the next.
@@ -692,6 +712,14 @@ def _decode_pv_entry(block: bytes) -> tuple[str | None, dict[str, Any]]:
     entry without one returns ``None`` for it - the coordinator cannot claim
     such an entry, and it is not published.
 
+    An absent string is filled to 0 when the entry carries nothing at all
+    (the night shape) or when the strings present account for the total
+    within `_PV_TOTAL_SLACK_W` - the unit's own copy omits an idle string and
+    its total says so exactly. When they do not, the missing string was
+    producing and left out of this frame (the relayed 07:36:38 entry: 217 W
+    present against 239 stated), and its key stays out so the sensor keeps
+    its last reading rather than showing 0 W (PLAN-145).
+
     A block that will not decode costs its own entry and no more.
     """
     entry: dict[str, Any] = {}
@@ -704,12 +732,32 @@ def _decode_pv_entry(block: bytes) -> tuple[str | None, dict[str, Any]]:
     for num, wire, value in _iter_fields(block):
         if num == _PV_SERIAL_FIELD and wire == 2:
             serial = _serial_text(value)
-    for group, defaults in _PV_ZERO_FILL_KEYS.items():
-        if group not in seen:
+    for _group, defaults in _PV_ZERO_FILL_KEYS.items():
+        present = [key for key, _zero in defaults if key in entry]
+        if present and not _pv_total_accounts_for(entry, defaults):
             continue
         for key, zero in defaults:
             entry.setdefault(key, zero)
     return serial, entry
+
+
+def _pv_total_accounts_for(
+    entry: dict[str, Any], defaults: tuple[tuple[str, Any], ...]
+) -> bool:
+    """Whether the strings in `entry` add up to its total, within the slack.
+
+    Without a total nothing can vouch for an absent string, so the answer is
+    no; with one, the present strings are summed and compared.
+    """
+    total = entry.get(_PV_TOTAL_KEY)
+    if not isinstance(total, (int, float)):
+        return False
+    strings = sum(
+        float(entry[key])
+        for key, _zero in defaults
+        if key in entry and key != _PV_TOTAL_KEY
+    )
+    return abs(float(total) - strings) <= _PV_TOTAL_SLACK_W
 
 
 # Every key one task list readback can produce, in the order the two kinds are

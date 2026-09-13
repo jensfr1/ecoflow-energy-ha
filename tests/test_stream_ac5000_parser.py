@@ -24,6 +24,7 @@ GET_REPLY = FIXTURES / "es22_get_reply_masked.json"
 PUSHES = FIXTURES / "es22_push_capture_masked.json"
 ES21_PV = FIXTURES / "es21_pv_masked.json"
 ES21_PAIR = FIXTURES / "es21_pair_pv_masked.json"
+ES21_PAIR_BOTH = FIXTURES / "es21_pair_pv_both_connections_masked.json"
 PV_KEYS = ("pv_total_w", "pv1_w", "pv2_w", "pv3_w", "pv4_w")
 
 
@@ -1103,7 +1104,8 @@ class TestPvStrings:
         assert strings["pv3_w"] == pytest.approx(55.32, abs=0.01)
         assert strings["pv4_w"] == pytest.approx(104.02, abs=0.01)
         # String 1 was idle throughout the capture and the app showed 0 W.
-        # The field is absent, and the fill is what turns that into a reading.
+        # The field is absent, and the fill is what turns that into a
+        # reading: the three present strings account for the total exactly.
         assert strings["pv1_w"] == 0.0
         # The third-party figure is a different quantity, not the total.
         assert parsed["solar_w"] == pytest.approx(81.0)
@@ -1116,7 +1118,12 @@ class TestPvStrings:
                 assert key not in parsed, (frame["ts_iso"], key)
 
     def test_the_total_equals_the_sum_of_the_strings(self) -> None:
-        """The identity the block has to preserve, on every real frame."""
+        """The identity the block has to preserve, on every real frame.
+
+        Every key is read strictly: an idle string omitted from the wire is
+        filled to 0 because the present strings account for the total, and
+        this is the test that says the fill still does that.
+        """
         checked = 0
         for frame in _load(ES21_PV):
             parsed = parse_stream_ac5000_message(bytes.fromhex(frame["hex"])) or {}
@@ -1225,6 +1232,79 @@ class TestLinkedPairPvStrings:
     def _units() -> tuple[str, str]:
         fixture = json.loads(ES21_PAIR.read_text(encoding="utf-8"))
         return fixture["unit_a"], fixture["unit_b"]
+
+    @staticmethod
+    def _both_frame(index: int) -> dict:
+        """The parsed result of frame `index` of the both-connections fixture.
+
+        Both units' `f50`/`f54` entries, whichever connection captured the
+        frame - unlike `_frames()`/`_units()` above, which only ever see the
+        connection owner's own entry relayed flat (#401's original shape).
+        """
+        fixture = json.loads(ES21_PAIR_BOTH.read_text(encoding="utf-8"))
+        frame = fixture["frames"][index]
+        parsed = parse_stream_ac5000_message(bytes.fromhex(frame["hex"]))
+        assert parsed is not None, frame
+        return parsed
+
+    def test_an_idle_string_omitted_from_the_own_copy_still_reads_zero(self) -> None:
+        """Frame 0 of the single-unit capture (06:42:06): one string, `.3` equal to it.
+
+        The unit's own copy omits an idle string and its total accounts for
+        the ones present, so the fill runs and the absent strings read 0 W.
+        """
+        frames = json.loads(ES21_PV.read_text(encoding="utf-8"))["frames"]
+        parsed = parse_stream_ac5000_message(bytes.fromhex(frames[0]["hex"]))
+        assert parsed is not None
+        strings = next(iter(parsed[UNIT_PV_BY_SN_KEY].values()))
+        assert set(strings) == set(PV_KEYS)
+        assert strings["pv_total_w"] > 0
+        present = [strings[f"pv{n}_w"] for n in (1, 2, 3, 4) if strings[f"pv{n}_w"] > 0]
+        assert len(present) == 1
+        assert present[0] == pytest.approx(strings["pv_total_w"], abs=0.01)
+
+    def test_a_pv_entry_with_a_total_and_a_missing_string_leaves_that_key_out(
+        self,
+    ) -> None:
+        """Frame 17 (07:36:38): entry AAAA sums to 217 of a stated 239.
+
+        `.12` (`pv4_w`) is absent from the wire while `.3`, `.9`, `.10`,
+        `.11` are present, so under the entry's own fields the fourth string
+        is producing and simply not in this frame - filling it to 0 would
+        publish a false reading for a live string (PLAN-145).
+        """
+        fixture = json.loads(ES21_PAIR_BOTH.read_text(encoding="utf-8"))
+        unit_a, unit_b = fixture["unit_a"], fixture["unit_b"]
+        parsed = self._both_frame(17)
+        entries = parsed[UNIT_PV_BY_SN_KEY]
+
+        entry_a = entries[unit_a]
+        assert entry_a == {
+            "pv_total_w": pytest.approx(239.0),
+            "pv1_w": pytest.approx(72.0),
+            "pv2_w": pytest.approx(71.0),
+            "pv3_w": pytest.approx(74.0),
+        }
+        assert "pv4_w" not in entry_a
+
+        entry_b = entries[unit_b]
+        for key in PV_KEYS:
+            assert key in entry_b, key
+
+    def test_a_night_pv_entry_still_fills_all_five_to_zero(self) -> None:
+        """Frames 0, 1, 4: no total and no string on either serial.
+
+        None of the five keys is on the wire for either unit, so the fill
+        still runs in full - the night close this integration must not lose
+        while fixing the missing-string case above (PLAN-145).
+        """
+        fixture = json.loads(ES21_PAIR_BOTH.read_text(encoding="utf-8"))
+        unit_a, unit_b = fixture["unit_a"], fixture["unit_b"]
+        for index in (0, 1, 4):
+            parsed = self._both_frame(index)
+            entries = parsed[UNIT_PV_BY_SN_KEY]
+            for serial in (unit_a, unit_b):
+                assert entries[serial] == dict.fromkeys(PV_KEYS, 0.0), (index, serial)
 
     def test_two_entries_survive_each_other(self) -> None:
         """Two synthetic entries, distinct on every string, both come back."""
