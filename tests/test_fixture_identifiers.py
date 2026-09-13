@@ -62,6 +62,23 @@ _PLACEHOLDERS = frozenset(
 )
 
 
+def _is_masked(run: str) -> bool:
+    """Whether an alphanumeric run is the mask, give or take the bytes beside it.
+
+    A masked serial is a run of `X`. On the wire a serial is followed by the
+    next field's bytes, and when those happen to be letters or digits the
+    run the sweep sees is the mask plus a tail. On a parallel energy stream
+    row (PLAN-148) that tail can be up to ten characters: the tag of field
+    9 (`0x4d`, `M`), its four float bytes, the tag of field 10 (`0x55`, `U`)
+    and four more float bytes, every one of which may fall in `[0-9A-Za-z]`.
+    So the tolerance is not one byte. What matters is whether anything
+    identifier-shaped survived beside the mask, and the threshold for that
+    is the same twelve characters `_RUN` uses: strip the mask from both ends
+    and judge what is left by the rule everything else is judged by.
+    """
+    return len(run.strip("X")) < 12
+
+
 def _fixture_files() -> list[Path]:
     """Every fixture file, not only the JSON ones.
 
@@ -135,7 +152,7 @@ def _leaks(raw: bytes) -> list[str]:
             for region in keyed_regions
         ):
             continue
-        if set(run) != {"X"}:
+        if not _is_masked(run):
             findings.append(f"unmasked run {run!r}")
 
     for start, end in _anchored_string_fields(raw):
@@ -163,7 +180,7 @@ def _leaks(raw: bytes) -> list[str]:
         for run in _RUN.findall(region_text):
             if run in _PLACEHOLDERS:
                 continue
-            if set(run) != {"X"}:
+            if not _is_masked(run):
                 findings.append(f"unmasked run under the mask {run!r}")
         for start, end in _anchored_string_fields(region_raw):
             value = region_raw[start:end]
@@ -417,3 +434,15 @@ def test_a_real_serial_under_a_keyed_region_is_still_a_leak() -> None:
     raw[region.start : region.end] = _xor(bytes(plain), region.key)
     findings = _leaks(bytes(raw))
     assert any("under the mask" in finding for finding in findings), findings
+
+
+def test_the_mask_tolerates_a_tail_below_the_identifier_threshold() -> None:
+    """Eleven bytes beside the mask are wire bytes; twelve are an identifier."""
+    mask = "X" * 16
+
+    assert _is_masked(mask)
+    assert _is_masked(mask + "M")
+    assert _is_masked(mask + "MabcdUefgh1")
+    assert not _is_masked(mask + "ABCDEFGHIJKL")
+    assert not _is_masked("ABCDEFGHIJKL" + mask)
+    assert not _is_masked("ABCDEF" + mask + "GHIJKL")
