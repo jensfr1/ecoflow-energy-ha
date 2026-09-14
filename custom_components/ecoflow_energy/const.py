@@ -152,6 +152,30 @@ POWERPULSE2_CHARGE_ACTION_CONFIRMED: dict[str, frozenset[str]] = {
     "start": frozenset({"charging"}),
     "stop": frozenset({"finishing", "available"}),
 }
+# PLAN-146: the confirmation window for a maximum-current write. Measured 1-2 s
+# on the wallbox's own settings report (ParamReport 2/34) over the ten writes
+# with an echo on file (seven on 2026-08-24, three on 2026-09-10); the
+# heartbeat alone can take up to ~60 s, so a wallbox that stops sending the
+# settings report fails loudly rather than silently.
+POWERPULSE2_MAX_CURRENT_WINDOW_S: float = 20.0
+# PLAN-146: the maximum current range, the owner's sweep on #7 covered end to
+# end (2026-09-10).
+POWERPULSE2_MAX_CURRENT_RANGE_A: tuple[int, int] = (6, 16)
+# PLAN-147: the confirmation window for a charging-mode write. Heartbeat
+# cadence is 60 s; the four echoes on @Xygen's capture (issue #7,
+# 2026-09-13) range from 0.7 to 56 s.
+POWERPULSE2_CHARGE_MODE_WINDOW_S: float = 75.0
+# PLAN-147: the charging-mode options and the wire values
+# `EDevPileParamSet.work_mode` uses for each - the app's own labels,
+# confirmed byte-for-byte against five mode writes and their heartbeat
+# echoes (issue #7, 2026-09-13).
+POWERPULSE2_CHARGE_MODE_OPTIONS: tuple[str, ...] = ("fast", "solar", "custom", "smart")
+POWERPULSE2_CHARGE_MODE_WIRE: dict[str, int] = {
+    "fast": 1,
+    "solar": 2,
+    "custom": 3,
+    "smart": 4,
+}
 MQTT_HEALTH_CHECK_INTERVAL_S = (
     5.0  # Run stale/reconnect health checks independently from stale threshold
 )
@@ -7087,6 +7111,27 @@ POWERPULSE2_SENSORS: list[EcoFlowSensorDef] = [
             "faulted",
         ],
     ),
+    # The wallbox's own charging-mode setting (PLAN-147), read from its
+    # heartbeat field 63 sub-field 4, the linkage record every heartbeat on
+    # file carries, with or without a PowerOcean on the account (every `2/33`
+    # in the seven powerpulse fixtures, 46 of 46 on 2026-09-14, all four
+    # modes among them; `test_charge_mode_on_every_heartbeat_in_the_corpus`
+    # holds that floor). `accessory=True`
+    # like `ev_charge_status` above: created on the first report. Mirrors
+    # `ev_max_current_a`'s sensor + number pair: the sensor exists on every
+    # route, the select below is sibling-only (async_set_powerpulse_charge_mode()).
+    EcoFlowSensorDef(
+        "ev_charge_mode",
+        "Wallbox Charging Mode",
+        None,
+        "enum",
+        None,
+        "mdi:ev-station",
+        None,
+        enhanced_only=True,
+        accessory=True,
+        options=list(POWERPULSE2_CHARGE_MODE_OPTIONS),
+    ),
     # Unix seconds on the wire; the sensor platform converts it to a UTC
     # datetime for the `timestamp` device class (see EcoFlowSensor.native_value).
     EcoFlowSensorDef(
@@ -7178,6 +7223,50 @@ POWERPULSE2_BUTTONS: list[EcoFlowButtonDef] = [
         "stop",
         "ev_charger_sn",
         "mdi:stop",
+    ),
+]
+
+# The wallbox's own maximum-current control (PLAN-146). The same key as the
+# sensor on purpose - one reading, the value the wallbox itself reports on
+# its settings report and heartbeat, so the number shows what the sensor
+# shows and a write returns only once the wallbox reports the new value
+# back. Created on the first `ev_max_current_a` report, the same accessory
+# pattern as the cable lock binary sensor and the start/stop buttons above.
+# Unlike those, the platform setup restricts this control to an entry with
+# exactly one PowerOcean: the write has no evidenced route on the wallbox's
+# own channel (PLAN-146 decision 2), so an entry with zero or two-or-more
+# PowerOceans gets no number at all - the coordinator write itself refuses
+# on the same condition, see async_set_powerpulse_max_current().
+POWERPULSE2_NUMBERS: list[EcoFlowNumberDef] = [
+    EcoFlowNumberDef(
+        "ev_max_current_a",
+        "Wallbox Maximum Current",
+        "ev_max_current_a",
+        "A",
+        "mdi:current-ac",
+        POWERPULSE2_MAX_CURRENT_RANGE_A[0],
+        POWERPULSE2_MAX_CURRENT_RANGE_A[1],
+        1,
+        enhanced_only=True,
+        accessory=True,
+    ),
+]
+
+# The wallbox's own charging-mode control (PLAN-147). Sibling route only,
+# the same reasoning as POWERPULSE2_NUMBERS above: the write has no
+# evidenced route on the wallbox's own channel, so an entry with zero or
+# two-or-more PowerOceans gets no select at all - the coordinator write
+# itself refuses on the same condition, see async_set_powerpulse_charge_mode().
+# "smart" stays in the option list so the select can display the state, but
+# selecting it raises before anything is published (PLAN-147 decision 3).
+POWERPULSE2_SELECTS: list[EcoFlowSelectDef] = [
+    EcoFlowSelectDef(
+        "ev_charge_mode",
+        "Wallbox Charging Mode",
+        "ev_charge_mode",
+        POWERPULSE2_CHARGE_MODE_OPTIONS,
+        icon="mdi:ev-station",
+        enhanced_only=True,
     ),
 ]
 

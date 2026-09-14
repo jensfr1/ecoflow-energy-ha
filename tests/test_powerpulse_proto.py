@@ -19,9 +19,16 @@ from ecoflow_energy.ecoflow.parsers.powerpulse_proto import (
     _finalize,
     parse_powerpulse_message,
 )
+from ecoflow_energy.ecoflow.proto_encoding import (
+    encode_field_bytes,
+    encode_field_varint,
+)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "powerpulse" / "c376_frames_plan132.json"
 IDLE_LIMIT_FIXTURE = FIXTURE.with_name("c376_idle_limit_steps_20260910.json")
+PARAM_SET_ECHO_FIXTURE = FIXTURE.with_name("c376_param_set_echo_20260824.json")
+PARAM_SET_ECHO_SWEEP_FIXTURE = FIXTURE.with_name("c376_param_set_echo_20260910.json")
+CHARGE_MODE_ECHO_FIXTURE = FIXTURE.with_name("c376_charging_mode_echo_20260913.json")
 
 
 def _frames() -> list[dict[str, Any]]:
@@ -194,6 +201,37 @@ def test_cable_lock_false_value_reported() -> None:
     """
     result = _finalize({"_cable_lock_raw": 0})
     assert result["ev_cable_lock_enabled"] is False
+
+
+def test_param_report_carries_the_configured_maximum_current() -> None:
+    """`2/34` field 9 becomes `ev_max_current_a` (PLAN-146).
+
+    The 2026-08-24 recording's seven `ParamReport` frames: the first echoes
+    the 11 A write that triggered it, the remaining six echo a later 16 A
+    write. The 2026-09-10 sweep gives four more values end to end.
+    """
+    frames = json.loads(PARAM_SET_ECHO_FIXTURE.read_text())["frames"]
+    expected_by_index = {0: 11.0, 1: 16.0, 2: 16.0, 4: 16.0, 6: 16.0, 8: 16.0, 9: 16.0}
+    for index, value in expected_by_index.items():
+        result = parse_powerpulse_message(bytes.fromhex(frames[index]["hex"]))
+        assert result is not None
+        assert result["ev_max_current_a"] == value
+
+    sweep_frames = json.loads(PARAM_SET_ECHO_SWEEP_FIXTURE.read_text())["frames"]
+    for index, value in enumerate((6.0, 7.0, 14.0, 7.0)):
+        result = parse_powerpulse_message(bytes.fromhex(sweep_frames[index]["hex"]))
+        assert result is not None
+        assert result["ev_max_current_a"] == value
+
+
+def test_heartbeat_and_param_report_agree_on_the_key() -> None:
+    """The three `2/33` HeartBeat frames of the same recording feed the same
+    `ev_max_current_a` key as the `2/34` ParamReport frames (PLAN-146)."""
+    frames = json.loads(PARAM_SET_ECHO_FIXTURE.read_text())["frames"]
+    for index in (3, 5, 7):
+        result = parse_powerpulse_message(bytes.fromhex(frames[index]["hex"]))
+        assert result is not None
+        assert result["ev_max_current_a"] == 16.0
 
 
 def test_unmapped_enum_numbers_drop_the_key_instead_of_writing_none() -> None:
@@ -399,3 +437,187 @@ def test_zero_session_start_timestamp_is_withheld_not_published() -> None:
     assert result["ev_session_duration_s"] == 0
     assert result["ev_session_energy_wh"] == 0
     assert result["ev_session_start_energy_wh"] == 0
+
+
+# --- Charging mode, field 63 sub-field 4 (PLAN-147, #7, capture of
+# 2026-09-13) ---------------------------------------------------------------
+
+
+def _charge_mode_echo_frames() -> list[dict[str, Any]]:
+    return json.loads(CHARGE_MODE_ECHO_FIXTURE.read_text())["frames"]
+
+
+def _parse_charge_mode_echo(ts_iso: str) -> dict[str, Any] | None:
+    for frame in _charge_mode_echo_frames():
+        if frame["ts_iso"].startswith(ts_iso):
+            return parse_powerpulse_message(bytes.fromhex(frame["hex"]))
+    raise AssertionError(f"no frame captured at {ts_iso}")
+
+
+def test_charge_mode_echo_reports_solar_then_smart_then_solar() -> None:
+    """The three mode-write echoes actually kept in the fixture: the
+    identifier gate dropped the heartbeat that would have carried the
+    Custom write's echo (`3`, see the fixture note in PLAN-147), so only
+    the Solar and Smart transitions are checked here."""
+    result = _parse_charge_mode_echo("2026-09-13T22:49:14.763")
+    assert result is not None
+    assert result["ev_charge_mode"] == "solar"
+
+    result = _parse_charge_mode_echo("2026-09-13T22:50:12.810")
+    assert result is not None
+    assert result["ev_charge_mode"] == "smart"
+
+    result = _parse_charge_mode_echo("2026-09-13T22:51:13.907")
+    assert result is not None
+    assert result["ev_charge_mode"] == "solar"
+
+
+def test_charge_mode_baseline_heartbeats_report_solar() -> None:
+    """The three heartbeats captured before any write in the recording all
+    report Solar - the mode the wallbox was already in."""
+    for ts_iso in (
+        "2026-09-13T22:37:13",
+        "2026-09-13T22:39:13",
+        "2026-09-13T22:42:14",
+    ):
+        result = _parse_charge_mode_echo(ts_iso)
+        assert result is not None
+        assert result["ev_charge_mode"] == "solar", ts_iso
+
+
+def test_charge_mode_param_report_frames_carry_no_mode() -> None:
+    """Field 63 lives on the HeartBeat (2/33) only - the three `2/34`
+    ParamReport frames in the same fixture report no charging mode at all."""
+    for frame in _charge_mode_echo_frames():
+        if frame["cmds"][0]["cmd_id"] != 34:
+            continue
+        result = parse_powerpulse_message(bytes.fromhex(frame["hex"]))
+        assert result is not None
+        assert "ev_charge_mode" not in result
+
+
+def _synthetic_heartbeat_with_charge_mode(work_mode: int) -> bytes:
+    """A synthetic, unmasked `2/33` heartbeat carrying only field 63
+    (`po_linkage_param`) sub-field 4 (`work_mode`) - built by hand because
+    Fast (1) and Custom (3) fell to the fixture's identifier gate and are
+    not decodable from the capture (PLAN-147 evidence table)."""
+    po_linkage = (
+        encode_field_varint(1, 1)
+        + encode_field_varint(2, 1)
+        + encode_field_bytes(3, b"X" * 16)
+        + encode_field_varint(4, work_mode)
+        + encode_field_varint(5, 1)
+    )
+    pdata = encode_field_bytes(63, po_linkage)
+    header = (
+        encode_field_bytes(1, pdata)
+        + encode_field_varint(8, 2)
+        + encode_field_varint(9, 33)
+    )
+    return encode_field_bytes(1, header)
+
+
+def test_charge_mode_synthetic_fast_and_custom() -> None:
+    """Fast (1) and Custom (3), the two wire values absent from the fixture,
+    decode correctly from a hand-built frame using the same field layout."""
+    for work_mode, expected in ((1, "fast"), (3, "custom")):
+        result = parse_powerpulse_message(
+            _synthetic_heartbeat_with_charge_mode(work_mode)
+        )
+        assert result is not None
+        assert result["ev_charge_mode"] == expected
+
+
+def test_charge_mode_unmapped_number_drops_the_key() -> None:
+    """Same reasoning as the other three enum fields this parser resolves:
+    an unrecognised `work_mode` must drop the key, not publish `None`."""
+    assert "ev_charge_mode" not in _finalize({"_charge_mode_raw": 9})
+
+
+def test_charge_mode_reported_on_every_plan132_frame() -> None:
+    """Field 63 is a genuine HeartBeat field, not one this recording happens
+    to omit: all ten PLAN-132 frames (a different session, issue #7,
+    2026-09-07) carry it, every one reporting Custom - the mode that
+    session's wallbox was set to throughout."""
+    checked = 0
+    for frame in _frames():
+        result = _parse(frame["ts_iso"])
+        assert result is not None
+        assert result["ev_charge_mode"] == "custom"
+        checked += 1
+    assert checked == 10
+
+
+def test_charge_mode_on_every_heartbeat_in_the_corpus() -> None:
+    """Every `2/33` in every powerpulse fixture carries the linkage record
+    with a mapped mode: 46 heartbeats in seven fixtures from six recordings
+    on 2026-09-14, with and without a PowerOcean on the account. The floor
+    sits at that count rather than at 1, so a parser that quietly stopped
+    reading the field on most frames, or a fixture that lost its heartbeats,
+    is caught (`verify-the-checker`, shape 3)."""
+    from ecoflow_energy.ecoflow.proto.decoder import decode_header_message
+
+    heartbeats = 0
+    modes: set[str] = set()
+    for path in sorted(FIXTURE.parent.glob("*.json")):
+        payload = json.loads(path.read_text())
+        frames = payload.get("frames") or payload.get("pushes") or []
+        for frame in frames:
+            raw = bytes.fromhex(frame.get("hex") or frame.get("frame_hex") or "")
+            headers, _ = decode_header_message(raw)
+            if not any(
+                h.get("cmd_func") == 2 and h.get("cmd_id") == 33 for h in headers
+            ):
+                continue
+            result = parse_powerpulse_message(raw)
+            assert result is not None, (path.name, frame.get("ts_iso"))
+            assert "ev_charge_mode" in result, (path.name, frame.get("ts_iso"))
+            heartbeats += 1
+            modes.add(result["ev_charge_mode"])
+    assert heartbeats >= 46
+    assert modes == {"fast", "solar", "custom", "smart"}
+
+
+def test_charge_mode_c374_frames_report_fast_then_solar() -> None:
+    """The one real-frame source for `fast`: the `C374` recording (#7,
+    2026-09-11) carries mode 1 on its first two heartbeats and mode 2 on the
+    four that follow. Its owner described the sessions as "from the grid at
+    the full rate" and then "solar-controlled at lower currents", which is
+    the same order - an independent reading of 1 and 2 from a second owner
+    and a second wallbox, without a write to line them up against."""
+    modes = [(ts[11:19], result["ev_charge_mode"]) for ts, result in _c374_results()]
+    assert modes == [
+        ("13:19:18", "fast"),
+        ("13:24:21", "fast"),
+        ("13:32:28", "solar"),
+        ("13:37:00", "solar"),
+        ("13:42:03", "solar"),
+        ("13:44:51", "solar"),
+    ]
+
+
+def test_charge_mode_absent_from_a_message_with_no_field_63() -> None:
+    """Positive control the other way: `EDevRunDataSync` (241/44) is a
+    different message entirely and never carries field 63, so every frame
+    of that fixture reports no charging mode - the key is genuinely
+    conditional on the field being present, not defaulted from elsewhere."""
+    run_data_sync_fixture = FIXTURE.with_name("c376_run_data_sync_20260824.json")
+    frames = json.loads(run_data_sync_fixture.read_text())["frames"]
+    assert len(frames) > 0
+    for frame in frames:
+        result = parse_powerpulse_message(bytes.fromhex(frame["hex"]))
+        if result is None:
+            continue
+        assert "ev_charge_mode" not in result
+
+
+def test_charge_mode_field_does_not_disturb_existing_keys() -> None:
+    """Adding field 63 to the HeartBeat field loop must not change any of
+    the values already asserted for this frame elsewhere in this file."""
+    result = _parse("2026-09-07T13:11:27")
+    assert result is not None
+    assert result["ev_charge_status"] == "charging"
+    assert result["ev_max_current_a"] == 16.0
+    assert result["ev_charge_current_a"] == 10.0
+    assert result["ev_phase_mode"] == "three_phase"
+    assert result["ev_charge_power_w"] == 6599.2
