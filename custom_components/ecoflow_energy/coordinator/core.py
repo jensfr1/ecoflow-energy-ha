@@ -38,6 +38,7 @@ from ..const import (
     DEVICE_TYPE_DELTA,
     DEVICE_TYPE_DELTA3,
     DEVICE_TYPE_DISPLAY_NAMES,
+    DEVICE_TYPE_OCEAN2,
     DEVICE_TYPE_POWEROCEAN,
     DEVICE_TYPE_POWERSTREAM,
     DEVICE_TYPE_SMARTPLUG,
@@ -47,6 +48,8 @@ from ..const import (
     DEVICE_TYPE_WAVE3,
     DOMAIN,
     HTTP_FALLBACK_INTERVAL_S,
+    OCEAN2_ENERGY_FROM_API,
+    OCEAN2_POWER_TO_ENERGY,
     POWEROCEAN_ENERGY_FROM_API,
     POWEROCEAN_POWER_TO_ENERGY,
     POWERSTREAM_ENERGY_FROM_API,
@@ -474,6 +477,9 @@ class EcoFlowDeviceCoordinator(
         elif self.device_type == DEVICE_TYPE_WAVE3:
             self._power_to_energy = WAVE3_POWER_TO_ENERGY
             self._energy_from_api = WAVE3_ENERGY_FROM_API
+        elif self.device_type == DEVICE_TYPE_OCEAN2:
+            self._power_to_energy = OCEAN2_POWER_TO_ENERGY
+            self._energy_from_api = OCEAN2_ENERGY_FROM_API
         else:
             self._power_to_energy = {}
             self._energy_from_api = []

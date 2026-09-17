@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from ..const import (
     DEVICE_TYPE_DELTA,
     DEVICE_TYPE_DELTA3,
+    DEVICE_TYPE_OCEAN2,
     DEVICE_TYPE_POWEROCEAN,
     DEVICE_TYPE_POWERPULSE2,
     DEVICE_TYPE_POWERSTREAM,
@@ -40,6 +41,7 @@ from ..ecoflow.parsers.delta3_proto import (
     parse_delta3_display_property,
 )
 from ..ecoflow.parsers.delta_http import parse_delta_http_quota
+from ..ecoflow.parsers.ocean2_proto import parse_ocean2_proto_message
 from ..ecoflow.parsers.powerocean import parse_powerocean_http_quota
 from ..ecoflow.parsers.powerocean_proto import (
     flatten_heartbeat,
@@ -502,6 +504,12 @@ class MqttIngestMixin(_Base):
                 # cmd_func 2, never registered in any device-type registry
                 # table - the parser decodes every header itself, the same
                 # way the WAVE 3 parser above does.
+                # Ocean 2 (#145): its own (254, 39) telemetry frame with
+                # nested submessages, registered in no device-type table -
+                # the parser decodes every header itself, the same shape as
+                # the WAVE 3 and PowerPulse 2 above.
+                if self.device_type == DEVICE_TYPE_OCEAN2:
+                    return parse_ocean2_proto_message(payload)
                 if self.device_type == DEVICE_TYPE_POWERPULSE2:
                     return parse_powerpulse_message(payload)
                 return self._parse_proto_device_data(payload)
@@ -622,6 +630,12 @@ class MqttIngestMixin(_Base):
                 # registered in no device-type table, the same shape as the
                 # WAVE 3 above. This is the bundled get_reply, which is where
                 # the settings read-back (2/34) arrives.
+                # Ocean 2 (#145): its own (254, 39) telemetry frame with
+                # nested submessages, registered in no device-type table -
+                # the parser decodes every header itself, the same shape as
+                # the WAVE 3 and PowerPulse 2 above.
+                if self.device_type == DEVICE_TYPE_OCEAN2:
+                    return parse_ocean2_proto_message(payload)
                 if self.device_type == DEVICE_TYPE_POWERPULSE2:
                     return parse_powerpulse_message(payload)
                 if self.device_type == DEVICE_TYPE_POWEROCEAN:
