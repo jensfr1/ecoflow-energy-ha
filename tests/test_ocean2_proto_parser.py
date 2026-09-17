@@ -18,6 +18,7 @@ from ecoflow_energy.ecoflow.const import (
     get_device_type,
 )
 from ecoflow_energy.ecoflow.parsers.ocean2_proto import (
+    MAX_MODULES,
     parse_ocean2_proto_message,
 )
 
@@ -272,3 +273,66 @@ class TestRobustness:
         parsed = parse_ocean2_proto_message(_msg(1, header))
         assert parsed is not None
         assert parsed["soc_pct"] == pytest.approx(81.5)
+
+
+def _module(index: int, body: bytes = b"") -> bytes:
+    """A `254/46` frame: one module per header, module number in 5.15."""
+    return _frame(_msg(5, _vint(15, index) + body), cmd_id=46)
+
+
+class TestModuleFrame:
+    def test_reads_one_module(self) -> None:
+        # Power 1122.59 W, SoH 100 %, 4 cycles - the readings confirmed
+        # against a four-week-old system on 2026-07-28.
+        body = _f32(1, 1122.59) + _f32(3, 100.0) + _vint(17, 4) + _f32(38, 81.5)
+        parsed = parse_ocean2_proto_message(_module(1, body))
+        assert parsed is not None
+        assert parsed["module1_power_w"] == pytest.approx(1122.59, rel=1e-4)
+        assert parsed["module1_soh_pct"] == pytest.approx(100.0)
+        assert parsed["module1_cycles"] == 4
+        assert parsed["module1_soc_pct"] == pytest.approx(81.5)
+
+    def test_keeps_modules_apart(self) -> None:
+        # A frame bundles one header per module - two here, fourteen on a
+        # large installation. Readings must not bleed between them.
+        payload = _module(1, _f32(1, 1122.0)) + _module(2, _f32(1, -880.0))
+        parsed = parse_ocean2_proto_message(payload)
+        assert parsed is not None
+        assert parsed["module1_power_w"] == pytest.approx(1122.0)
+        assert parsed["module2_power_w"] == pytest.approx(-880.0)
+
+    def test_publishes_the_hottest_power_electronics_reading(self) -> None:
+        # Four board readings, one entity: the hottest is what matters, and
+        # four near-identical sensors per module would be noise at fourteen.
+        body = _f32(23, 41.0) + _f32(24, 47.5) + _f32(32, 39.0) + _f32(33, 44.0)
+        parsed = parse_ocean2_proto_message(_module(1, body))
+        assert parsed is not None
+        assert parsed["module1_mos_temp_c"] == pytest.approx(47.5)
+
+    def test_keeps_the_cell_temperatures_apart(self) -> None:
+        # min <= average <= max holds in every frame; they are separate
+        # readings, not one value rounded three ways.
+        body = _f32(21, 24.0) + _f32(30, 26.0) + _f32(31, 22.0)
+        parsed = parse_ocean2_proto_message(_module(1, body))
+        assert parsed is not None
+        assert parsed["module1_cell_temp_c"] == pytest.approx(24.0)
+        assert parsed["module1_cell_temp_max_c"] == pytest.approx(26.0)
+        assert parsed["module1_cell_temp_min_c"] == pytest.approx(22.0)
+
+    def test_drops_a_module_without_a_number(self) -> None:
+        # Without 5.15 there is nothing to attach the readings to, and
+        # guessing a position would file one module's cells under another.
+        payload = _frame(_msg(5, _f32(1, 1122.0)), cmd_id=46)
+        assert parse_ocean2_proto_message(payload) is None
+
+    @pytest.mark.parametrize("index", [0, MAX_MODULES + 1, 99])
+    def test_ignores_an_out_of_range_module_number(self, index: int) -> None:
+        assert parse_ocean2_proto_message(_module(index, _f32(1, 1.0))) is None
+
+    def test_reads_telemetry_and_modules_from_one_payload(self) -> None:
+        # Both frame types can arrive bundled; neither may swallow the other.
+        payload = _telemetry(summary=_f32(17, 81.5)) + _module(1, _f32(1, 1122.0))
+        parsed = parse_ocean2_proto_message(payload)
+        assert parsed is not None
+        assert parsed["soc_pct"] == pytest.approx(81.5)
+        assert parsed["module1_power_w"] == pytest.approx(1122.0)
