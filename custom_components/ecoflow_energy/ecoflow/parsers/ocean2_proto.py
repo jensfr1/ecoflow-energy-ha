@@ -102,10 +102,16 @@ _PV_STRINGS_KEY = "_pv_string_blocks"
 
 
 # Block 5 of the `254/46` frame - one battery module per header, with the
-# module number in 5.15. A frame bundles one header per module: two on the
-# reporter's own unit, thirteen and fourteen in recordings from other
-# installations, which is why the entities for them are created on report
-# rather than declared for a fixed count.
+# module number in 5.15.
+#
+# A frame bundles several of these headers, and the bundle size is not the
+# module count: a 98-record capture holds bundles of thirteen and fourteen
+# while carrying only two distinct module numbers, with field 37 - a
+# timestamp - stepping 3 to 7 seconds between the records inside one bundle.
+# It is a backlog of per-module heartbeats, not a snapshot of the pack. The
+# entities are still created on report rather than declared for a fixed
+# count: the module count is an installation choice either way, and keying
+# on the number actually seen is what makes the bundle case work at all.
 #
 # Three of these were corrected against the running unit on 2026-07-31, and
 # each correction was the wrong quantity rather than the wrong scale:
@@ -116,10 +122,10 @@ _PV_STRINGS_KEY = "_pv_string_blocks"
 #       harmless on a desk, permanently misleading in service.
 #   39  is the state of health, not the state of charge: constant 100.0
 #       across a whole measurement while 38 moved. The pair 38/39 mirrors
-#       the 2/3 of the older generation.
-#    6  is a cell voltage (3329 mV), not the pack voltage - it follows the
-#       load. The divide-by-ten it used to carry was the warning sign: a
-#       float needs no scaling.
+#       the 2/3 of the older generation. Read as a float; field 3 carries
+#       the same number as a varint.
+#    6  is a cell voltage in millivolts, not the pack voltage - it follows
+#       the load.
 #
 # The pack voltage does exist, in field 9. It was overlooked because 16.5 V
 # reads as implausibly low for a home battery - but the modules are wired 5S:
@@ -129,13 +135,24 @@ _PV_STRINGS_KEY = "_pv_string_blocks"
 _MODULE_FIELD_MAP: dict[str, tuple[str, str, float]] = {
     "5.15": ("_index", _TYPE_INT, 1),
     "5.1": ("power_w", _TYPE_FLOAT, 1),
-    "5.3": ("soh_pct", _TYPE_FLOAT, 1),
+    # 39, not 3. Both read a constant 100 on a healthy pack, so the values
+    # cannot tell them apart - the wire type can: field 3 arrives as a varint
+    # and 39 as a float, checked on raw frames from an RE11. The pair 38/39
+    # mirrors the 2/3 of the older generation, 38 being the state of charge
+    # that actually moves. Declaring 3 as a float meant the walker rejected
+    # it on type and the entity stayed empty; no test caught that, because
+    # the tests built field 3 as a float themselves.
+    "5.39": ("soh_pct", _TYPE_FLOAT, 1),
     "5.38": ("soc_pct", _TYPE_FLOAT, 1),
     "5.54": ("remaining_wh", _TYPE_FLOAT, 1),
     "5.17": ("cycles", _TYPE_INT, 1),
     "5.9": ("voltage_v", _TYPE_FLOAT, 1),
     "5.10": ("current_a", _TYPE_FLOAT, 1),
-    "5.6": ("cell_voltage_v", _TYPE_FLOAT, 1),
+    # Millivolts, like the PowerOcean cell-voltage entities - 3437 on a real
+    # frame. Published as mV rather than scaled to volts: 5 x 3.437 V is
+    # 17.19 V against 17.11 V in field 9, which is the 5S wiring and the
+    # cross-check that the field is a cell rather than the pack.
+    "5.6": ("cell_voltage_mv", _TYPE_FLOAT, 1),
     # Temperatures, separated on 2026-08-01 by a load test rather than by
     # their averages: 45 minutes of wallbox charging, up to 3.6 kW per
     # module. What tells them apart is how they move, not how warm they are.

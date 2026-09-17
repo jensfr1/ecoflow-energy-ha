@@ -69,7 +69,7 @@ Each module creates 12 sensors (5 core + 7 diagnostic). They are created once a 
 | Module N Power Electronics Temperature | °C |
 | Module N Voltage | V |
 | Module N Current | A |
-| Module N Max Cell Voltage | V |
+| Module N Max Cell Voltage | mV |
 
 > **The module SoC carries no battery device class.** Home Assistant shows one battery figure per device, and that is the system state of charge at the top of this page. A per-module class would put up to sixteen competing battery icons on one device.
 

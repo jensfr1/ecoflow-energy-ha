@@ -284,13 +284,23 @@ class TestModuleFrame:
     def test_reads_one_module(self) -> None:
         # Power 1122.59 W, SoH 100 %, 4 cycles - the readings confirmed
         # against a four-week-old system on 2026-07-28.
-        body = _f32(1, 1122.59) + _f32(3, 100.0) + _vint(17, 4) + _f32(38, 81.5)
+        # 39 for the state of health, as a float - field 3 carries the same
+        # number as a varint, which is how the two are told apart.
+        body = _f32(1, 1122.59) + _f32(39, 100.0) + _vint(17, 4) + _f32(38, 81.5)
         parsed = parse_ocean2_proto_message(_module(1, body))
         assert parsed is not None
         assert parsed["module1_power_w"] == pytest.approx(1122.59, rel=1e-4)
         assert parsed["module1_soh_pct"] == pytest.approx(100.0)
         assert parsed["module1_cycles"] == 4
         assert parsed["module1_soc_pct"] == pytest.approx(81.5)
+
+    def test_reads_the_state_of_health_as_a_float_from_39(self) -> None:
+        # Field 3 holds the same number as a varint on real frames. Declaring
+        # it as a float made the walker reject it on type and left the entity
+        # empty - a mistake the earlier tests hid by building 3 as a float.
+        parsed = parse_ocean2_proto_message(_module(1, _vint(3, 100) + _f32(39, 97.5)))
+        assert parsed is not None
+        assert parsed["module1_soh_pct"] == pytest.approx(97.5)
 
     def test_keeps_modules_apart(self) -> None:
         # A frame bundles one header per module - two here, fourteen on a
@@ -336,3 +346,78 @@ class TestModuleFrame:
         assert parsed is not None
         assert parsed["soc_pct"] == pytest.approx(81.5)
         assert parsed["module1_power_w"] == pytest.approx(1122.0)
+
+
+class TestRealModuleFrames:
+    """Two `254/46` payloads captured from an RE11 while the pack rested.
+
+    Serial numbers are replaced length-preservingly - protobuf carries a
+    length before every field, so a shorter replacement would make
+    everything after it unreadable and the fixture worthless for the purpose
+    it was taken for.
+    """
+
+    MODULE_1 = (
+        "081e2ae7020d00000000106318642a140000e8410000e0410000e0410000e0410000d841"
+        "3500d056453d0040554540014d48e1884155f0480bbf5d76be5644650000000068007214"
+        "00d0564500d0564500f055450040554500d0564578018201105858585858585858585858"
+        "58585858588801239001009d0100002f45a50100c02845ad010000e041b5010000e841bd"
+        "010000e041c5010000e041cd0100001042d001e8d1a005d801c9f0a305e001909513e801"
+        "d98f13f5010000e841fd010000d84185020000e0418d020000d8419002009802ffff03a0"
+        "0221a802cebfafd506b5021c32c742bd020000c842c00220c80205d00264d80201e00200"
+        "e80283d001f00201f802ab828408800385808408880302900301980301a00300a803f701"
+        "b50391ff9c45bd031c32c742c50300000000cd031c32c742d5031c32c742dd0300000000"
+        "e50343a0c742ed0300acc742f00300f803008004008804bead0b9004b3870ba00402ad04"
+        "00a05645"
+    )
+    MODULE_2 = (
+        "081e2ae7020d00000000106318642a140000d8410000d8410000d8410000d0410000d041"
+        "35007056453d00f0544540014da4708841555d1710bf5d94c35644650000000068007214"
+        "00f05445001056450070564500e0554500d0554578028201105858585858585858585858"
+        "58585858588801239001009d0100c02845a50100c02845ad010000d841b5010000e041bd"
+        "010000d841c5010000d841cd0100000c42d001fcb99e05d8018bb1a105e001909513e801"
+        "d98f13f5010000d841fd010000d04185020000d8418d020000d8419002009802ffff03a0"
+        "0221a802a3bfafd506b5025b37c742bd020000c842c00220c80205d00264d80201e00200"
+        "e80283d001f00201f802ab828408800385808408880302900301980301a00300a803f701"
+        "b50391ff9c45bd031c32c742c50300000000cd031c32c742d5031c32c742dd0300000000"
+        "e50343a0c742ed0300acc742f00300f803008004008804bead0b9004b3870ba00402ad04"
+        "00f05445"
+    )
+
+    def test_decodes_a_real_frame(self) -> None:
+        parsed = parse_ocean2_proto_message(
+            _frame(bytes.fromhex(self.MODULE_1), cmd_id=46)
+        )
+        assert parsed is not None
+        # State of charge moves, state of health does not - the pair that
+        # was mapped the wrong way round before.
+        assert parsed["module1_soc_pct"] == pytest.approx(99.598, abs=0.01)
+        assert parsed["module1_soh_pct"] == pytest.approx(100.0)
+        assert parsed["module1_remaining_wh"] == pytest.approx(5023.9, abs=0.1)
+        assert parsed["module1_cycles"] == 35
+
+    def test_the_cell_voltage_is_millivolts(self) -> None:
+        # 3437 mV, not 3437 V. Five cells in series at 3.437 V make 17.19 V
+        # against the 17.11 V the module reports as its own voltage - which
+        # is both the scale check and the proof that 5.6 is a cell.
+        parsed = parse_ocean2_proto_message(
+            _frame(bytes.fromhex(self.MODULE_1), cmd_id=46)
+        )
+        assert parsed is not None
+        cell_mv = parsed["module1_cell_voltage_mv"]
+        pack_v = parsed["module1_voltage_v"]
+        assert cell_mv == pytest.approx(3437.0)
+        assert 5 * cell_mv / 1000 == pytest.approx(pack_v, abs=0.2)
+
+    def test_reads_a_real_bundle_as_two_modules(self) -> None:
+        # The bundle size is not the module count: a frame carries one header
+        # per heartbeat, and a capture with bundles of fourteen still held
+        # only two distinct module numbers.
+        payload = _frame(bytes.fromhex(self.MODULE_1), cmd_id=46) + _frame(
+            bytes.fromhex(self.MODULE_2), cmd_id=46
+        )
+        parsed = parse_ocean2_proto_message(payload)
+        assert parsed is not None
+        assert parsed["module1_soc_pct"] == pytest.approx(99.598, abs=0.01)
+        assert parsed["module2_soc_pct"] == pytest.approx(99.608, abs=0.01)
+        assert parsed["module1_voltage_v"] != parsed["module2_voltage_v"]

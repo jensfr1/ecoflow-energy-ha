@@ -7351,14 +7351,14 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
         ),
         # Highest cell voltage, not the pack - it follows the load.
         EcoFlowSensorDef(
-            f"{m}_cell_voltage_v",
+            f"{m}_cell_voltage_mv",
             f"Module {n} Max Cell Voltage",
-            "V",
+            "mV",
             "voltage",
             "measurement",
             "mdi:flash-triangle-outline",
             "diagnostic",
-            suggested_display_precision=3,
+            suggested_display_precision=0,
             disabled_by_default=True,
             accessory=True,
         ),

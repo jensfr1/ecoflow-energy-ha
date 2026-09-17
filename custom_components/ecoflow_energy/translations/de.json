@@ -1762,9 +1762,6 @@
       "module1_current_a": {
         "name": "Modul 1 Strom"
       },
-      "module1_cell_voltage_v": {
-        "name": "Modul 1 Höchste Zellspannung"
-      },
       "module2_soc_pct": {
         "name": "Modul 2 Ladestand"
       },
@@ -1797,9 +1794,6 @@
       },
       "module2_current_a": {
         "name": "Modul 2 Strom"
-      },
-      "module2_cell_voltage_v": {
-        "name": "Modul 2 Höchste Zellspannung"
       },
       "module3_soc_pct": {
         "name": "Modul 3 Ladestand"
@@ -1834,9 +1828,6 @@
       "module3_current_a": {
         "name": "Modul 3 Strom"
       },
-      "module3_cell_voltage_v": {
-        "name": "Modul 3 Höchste Zellspannung"
-      },
       "module4_soc_pct": {
         "name": "Modul 4 Ladestand"
       },
@@ -1869,9 +1860,6 @@
       },
       "module4_current_a": {
         "name": "Modul 4 Strom"
-      },
-      "module4_cell_voltage_v": {
-        "name": "Modul 4 Höchste Zellspannung"
       },
       "module5_soc_pct": {
         "name": "Modul 5 Ladestand"
@@ -1906,9 +1894,6 @@
       "module5_current_a": {
         "name": "Modul 5 Strom"
       },
-      "module5_cell_voltage_v": {
-        "name": "Modul 5 Höchste Zellspannung"
-      },
       "module6_soc_pct": {
         "name": "Modul 6 Ladestand"
       },
@@ -1941,9 +1926,6 @@
       },
       "module6_current_a": {
         "name": "Modul 6 Strom"
-      },
-      "module6_cell_voltage_v": {
-        "name": "Modul 6 Höchste Zellspannung"
       },
       "module7_soc_pct": {
         "name": "Modul 7 Ladestand"
@@ -1978,9 +1960,6 @@
       "module7_current_a": {
         "name": "Modul 7 Strom"
       },
-      "module7_cell_voltage_v": {
-        "name": "Modul 7 Höchste Zellspannung"
-      },
       "module8_soc_pct": {
         "name": "Modul 8 Ladestand"
       },
@@ -2013,9 +1992,6 @@
       },
       "module8_current_a": {
         "name": "Modul 8 Strom"
-      },
-      "module8_cell_voltage_v": {
-        "name": "Modul 8 Höchste Zellspannung"
       },
       "module9_soc_pct": {
         "name": "Modul 9 Ladestand"
@@ -2050,9 +2026,6 @@
       "module9_current_a": {
         "name": "Modul 9 Strom"
       },
-      "module9_cell_voltage_v": {
-        "name": "Modul 9 Höchste Zellspannung"
-      },
       "module10_soc_pct": {
         "name": "Modul 10 Ladestand"
       },
@@ -2085,9 +2058,6 @@
       },
       "module10_current_a": {
         "name": "Modul 10 Strom"
-      },
-      "module10_cell_voltage_v": {
-        "name": "Modul 10 Höchste Zellspannung"
       },
       "module11_soc_pct": {
         "name": "Modul 11 Ladestand"
@@ -2122,9 +2092,6 @@
       "module11_current_a": {
         "name": "Modul 11 Strom"
       },
-      "module11_cell_voltage_v": {
-        "name": "Modul 11 Höchste Zellspannung"
-      },
       "module12_soc_pct": {
         "name": "Modul 12 Ladestand"
       },
@@ -2157,9 +2124,6 @@
       },
       "module12_current_a": {
         "name": "Modul 12 Strom"
-      },
-      "module12_cell_voltage_v": {
-        "name": "Modul 12 Höchste Zellspannung"
       },
       "module13_soc_pct": {
         "name": "Modul 13 Ladestand"
@@ -2194,9 +2158,6 @@
       "module13_current_a": {
         "name": "Modul 13 Strom"
       },
-      "module13_cell_voltage_v": {
-        "name": "Modul 13 Höchste Zellspannung"
-      },
       "module14_soc_pct": {
         "name": "Modul 14 Ladestand"
       },
@@ -2229,9 +2190,6 @@
       },
       "module14_current_a": {
         "name": "Modul 14 Strom"
-      },
-      "module14_cell_voltage_v": {
-        "name": "Modul 14 Höchste Zellspannung"
       },
       "module15_soc_pct": {
         "name": "Modul 15 Ladestand"
@@ -2266,9 +2224,6 @@
       "module15_current_a": {
         "name": "Modul 15 Strom"
       },
-      "module15_cell_voltage_v": {
-        "name": "Modul 15 Höchste Zellspannung"
-      },
       "module16_soc_pct": {
         "name": "Modul 16 Ladestand"
       },
@@ -2302,7 +2257,52 @@
       "module16_current_a": {
         "name": "Modul 16 Strom"
       },
-      "module16_cell_voltage_v": {
+      "module1_cell_voltage_mv": {
+        "name": "Modul 1 Höchste Zellspannung"
+      },
+      "module2_cell_voltage_mv": {
+        "name": "Modul 2 Höchste Zellspannung"
+      },
+      "module3_cell_voltage_mv": {
+        "name": "Modul 3 Höchste Zellspannung"
+      },
+      "module4_cell_voltage_mv": {
+        "name": "Modul 4 Höchste Zellspannung"
+      },
+      "module5_cell_voltage_mv": {
+        "name": "Modul 5 Höchste Zellspannung"
+      },
+      "module6_cell_voltage_mv": {
+        "name": "Modul 6 Höchste Zellspannung"
+      },
+      "module7_cell_voltage_mv": {
+        "name": "Modul 7 Höchste Zellspannung"
+      },
+      "module8_cell_voltage_mv": {
+        "name": "Modul 8 Höchste Zellspannung"
+      },
+      "module9_cell_voltage_mv": {
+        "name": "Modul 9 Höchste Zellspannung"
+      },
+      "module10_cell_voltage_mv": {
+        "name": "Modul 10 Höchste Zellspannung"
+      },
+      "module11_cell_voltage_mv": {
+        "name": "Modul 11 Höchste Zellspannung"
+      },
+      "module12_cell_voltage_mv": {
+        "name": "Modul 12 Höchste Zellspannung"
+      },
+      "module13_cell_voltage_mv": {
+        "name": "Modul 13 Höchste Zellspannung"
+      },
+      "module14_cell_voltage_mv": {
+        "name": "Modul 14 Höchste Zellspannung"
+      },
+      "module15_cell_voltage_mv": {
+        "name": "Modul 15 Höchste Zellspannung"
+      },
+      "module16_cell_voltage_mv": {
         "name": "Modul 16 Höchste Zellspannung"
       }
     },

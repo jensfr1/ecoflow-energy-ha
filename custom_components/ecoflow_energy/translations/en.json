@@ -1762,9 +1762,6 @@
       "module1_current_a": {
         "name": "Module 1 Current"
       },
-      "module1_cell_voltage_v": {
-        "name": "Module 1 Max Cell Voltage"
-      },
       "module2_soc_pct": {
         "name": "Module 2 SoC"
       },
@@ -1797,9 +1794,6 @@
       },
       "module2_current_a": {
         "name": "Module 2 Current"
-      },
-      "module2_cell_voltage_v": {
-        "name": "Module 2 Max Cell Voltage"
       },
       "module3_soc_pct": {
         "name": "Module 3 SoC"
@@ -1834,9 +1828,6 @@
       "module3_current_a": {
         "name": "Module 3 Current"
       },
-      "module3_cell_voltage_v": {
-        "name": "Module 3 Max Cell Voltage"
-      },
       "module4_soc_pct": {
         "name": "Module 4 SoC"
       },
@@ -1869,9 +1860,6 @@
       },
       "module4_current_a": {
         "name": "Module 4 Current"
-      },
-      "module4_cell_voltage_v": {
-        "name": "Module 4 Max Cell Voltage"
       },
       "module5_soc_pct": {
         "name": "Module 5 SoC"
@@ -1906,9 +1894,6 @@
       "module5_current_a": {
         "name": "Module 5 Current"
       },
-      "module5_cell_voltage_v": {
-        "name": "Module 5 Max Cell Voltage"
-      },
       "module6_soc_pct": {
         "name": "Module 6 SoC"
       },
@@ -1941,9 +1926,6 @@
       },
       "module6_current_a": {
         "name": "Module 6 Current"
-      },
-      "module6_cell_voltage_v": {
-        "name": "Module 6 Max Cell Voltage"
       },
       "module7_soc_pct": {
         "name": "Module 7 SoC"
@@ -1978,9 +1960,6 @@
       "module7_current_a": {
         "name": "Module 7 Current"
       },
-      "module7_cell_voltage_v": {
-        "name": "Module 7 Max Cell Voltage"
-      },
       "module8_soc_pct": {
         "name": "Module 8 SoC"
       },
@@ -2013,9 +1992,6 @@
       },
       "module8_current_a": {
         "name": "Module 8 Current"
-      },
-      "module8_cell_voltage_v": {
-        "name": "Module 8 Max Cell Voltage"
       },
       "module9_soc_pct": {
         "name": "Module 9 SoC"
@@ -2050,9 +2026,6 @@
       "module9_current_a": {
         "name": "Module 9 Current"
       },
-      "module9_cell_voltage_v": {
-        "name": "Module 9 Max Cell Voltage"
-      },
       "module10_soc_pct": {
         "name": "Module 10 SoC"
       },
@@ -2085,9 +2058,6 @@
       },
       "module10_current_a": {
         "name": "Module 10 Current"
-      },
-      "module10_cell_voltage_v": {
-        "name": "Module 10 Max Cell Voltage"
       },
       "module11_soc_pct": {
         "name": "Module 11 SoC"
@@ -2122,9 +2092,6 @@
       "module11_current_a": {
         "name": "Module 11 Current"
       },
-      "module11_cell_voltage_v": {
-        "name": "Module 11 Max Cell Voltage"
-      },
       "module12_soc_pct": {
         "name": "Module 12 SoC"
       },
@@ -2157,9 +2124,6 @@
       },
       "module12_current_a": {
         "name": "Module 12 Current"
-      },
-      "module12_cell_voltage_v": {
-        "name": "Module 12 Max Cell Voltage"
       },
       "module13_soc_pct": {
         "name": "Module 13 SoC"
@@ -2194,9 +2158,6 @@
       "module13_current_a": {
         "name": "Module 13 Current"
       },
-      "module13_cell_voltage_v": {
-        "name": "Module 13 Max Cell Voltage"
-      },
       "module14_soc_pct": {
         "name": "Module 14 SoC"
       },
@@ -2229,9 +2190,6 @@
       },
       "module14_current_a": {
         "name": "Module 14 Current"
-      },
-      "module14_cell_voltage_v": {
-        "name": "Module 14 Max Cell Voltage"
       },
       "module15_soc_pct": {
         "name": "Module 15 SoC"
@@ -2266,9 +2224,6 @@
       "module15_current_a": {
         "name": "Module 15 Current"
       },
-      "module15_cell_voltage_v": {
-        "name": "Module 15 Max Cell Voltage"
-      },
       "module16_soc_pct": {
         "name": "Module 16 SoC"
       },
@@ -2302,7 +2257,52 @@
       "module16_current_a": {
         "name": "Module 16 Current"
       },
-      "module16_cell_voltage_v": {
+      "module1_cell_voltage_mv": {
+        "name": "Module 1 Max Cell Voltage"
+      },
+      "module2_cell_voltage_mv": {
+        "name": "Module 2 Max Cell Voltage"
+      },
+      "module3_cell_voltage_mv": {
+        "name": "Module 3 Max Cell Voltage"
+      },
+      "module4_cell_voltage_mv": {
+        "name": "Module 4 Max Cell Voltage"
+      },
+      "module5_cell_voltage_mv": {
+        "name": "Module 5 Max Cell Voltage"
+      },
+      "module6_cell_voltage_mv": {
+        "name": "Module 6 Max Cell Voltage"
+      },
+      "module7_cell_voltage_mv": {
+        "name": "Module 7 Max Cell Voltage"
+      },
+      "module8_cell_voltage_mv": {
+        "name": "Module 8 Max Cell Voltage"
+      },
+      "module9_cell_voltage_mv": {
+        "name": "Module 9 Max Cell Voltage"
+      },
+      "module10_cell_voltage_mv": {
+        "name": "Module 10 Max Cell Voltage"
+      },
+      "module11_cell_voltage_mv": {
+        "name": "Module 11 Max Cell Voltage"
+      },
+      "module12_cell_voltage_mv": {
+        "name": "Module 12 Max Cell Voltage"
+      },
+      "module13_cell_voltage_mv": {
+        "name": "Module 13 Max Cell Voltage"
+      },
+      "module14_cell_voltage_mv": {
+        "name": "Module 14 Max Cell Voltage"
+      },
+      "module15_cell_voltage_mv": {
+        "name": "Module 15 Max Cell Voltage"
+      },
+      "module16_cell_voltage_mv": {
         "name": "Module 16 Max Cell Voltage"
       }
     },
