@@ -6,9 +6,9 @@ Full list of all entities created for the EcoFlow Ocean 2.
 
 The Ocean 2 reports through the account connection only, so it needs **Enhanced Mode**. The Developer API answers error 1006 for this device, the same position the `J32D`/`J32E` PowerOcean variants are in, so Standard Mode creates no usable entities.
 
-Two serial prefixes, one device: `RE11` for the 10 kW unit and `RE17` for the 12 kW one. They differ in power rating and in nothing this integration reads.
+Three serial prefixes, one device: `RE11` for the 10 kW unit, `RE17` for the 12 kW one and `RE41` for the 8 kW single-phase Ocean 2 Plus. They differ in power rating and phase count, and in nothing this integration reads - the per-phase block is not among the entities below.
 
-`RE11` is confirmed on two installations. `RE17` is routed on EcoFlow's own device list, which separates the two by power rating alone; no frame from an `RE17` exists yet, so if you own one, a note either way is welcome.
+`RE11` is confirmed on two installations and `RE41` on one, from an owner's diagnostics download on #145. `RE17` is routed on EcoFlow's own device list, which separates it from the `RE11` by power rating alone; no frame from an `RE17` exists yet, so if you own one, a note either way is welcome. `RE43`, the 12 kW Plus, is not routed here: it has been reported by an owner, but no frame from one exists on either side.
 
 Read-only. No write frame from an Ocean 2 has been observed, so there are no controls.
 
