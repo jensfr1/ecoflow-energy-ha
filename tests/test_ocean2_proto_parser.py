@@ -248,8 +248,9 @@ class TestRobustness:
         assert parsed is None or "grid_w" not in parsed
 
     def test_ignores_frames_from_other_command_ids(self) -> None:
-        # cmd_id 46 is the per-module battery frame, which this parser does
-        # not map yet. It must not be decoded through the telemetry layout.
+        # cmd_id 46 is the per-module battery frame. A telemetry-shaped body
+        # sent under it declares no module fields, so it must not be decoded
+        # through the telemetry layout either.
         payload = _frame(_msg(65, _f32(4, 3210.0)), cmd_id=46)
         assert parse_ocean2_proto_message(payload) is None
 
@@ -338,6 +339,33 @@ class TestModuleFrame:
     @pytest.mark.parametrize("index", [0, MAX_MODULES + 1, 99])
     def test_ignores_an_out_of_range_module_number(self, index: int) -> None:
         assert parse_ocean2_proto_message(_module(index, _f32(1, 1.0))) is None
+
+    def test_drops_a_nan_module_number_instead_of_raising(self) -> None:
+        # `int()` on a NaN raises; the same guard the telemetry frame applies
+        # to its own readings must cover the module index too.
+        payload = _module(1, _f32(15, float("nan")) + _f32(1, 1122.0))
+        assert parse_ocean2_proto_message(payload) is None
+
+    def test_drops_a_non_finite_module_reading(self) -> None:
+        # A NaN or an infinity reaching a sensor raises inside Home
+        # Assistant's rounding, the same reason the telemetry frame drops
+        # them - the module frame decodes through a different function and
+        # needs the same guard rather than inheriting it.
+        payload = _module(1, _f32(1, float("nan")) + _f32(38, 81.5))
+        parsed = parse_ocean2_proto_message(payload)
+        assert parsed is not None
+        assert "module1_power_w" not in parsed
+        assert parsed["module1_soc_pct"] == pytest.approx(81.5)
+
+    def test_a_non_finite_power_electronics_reading_does_not_poison_the_max(
+        self,
+    ) -> None:
+        # max() over a list containing NaN returns NaN in Python - one bad
+        # board sensor must not blank out the other three good ones.
+        body = _f32(23, 41.0) + _f32(24, float("nan")) + _f32(32, 39.0) + _f32(33, 44.0)
+        parsed = parse_ocean2_proto_message(_module(1, body))
+        assert parsed is not None
+        assert parsed["module1_mos_temp_c"] == pytest.approx(44.0)
 
     def test_reads_telemetry_and_modules_from_one_payload(self) -> None:
         # Both frame types can arrive bundled; neither may swallow the other.

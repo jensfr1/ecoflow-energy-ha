@@ -192,8 +192,22 @@ def _parse_module(pdata: bytes) -> dict[str, Any]:
     walked: dict[str, Any] = {}
     _walk(pdata, _MODULE_TREE, walked, set())
 
+    # Same guard `_parse_telemetry` applies to its own readings: a NaN or an
+    # infinity reaching a sensor raises inside Home Assistant's rounding and
+    # aborts the rest of that update, and `_walk` itself has no notion of this.
+    for key in [
+        key
+        for key, value in walked.items()
+        if isinstance(value, float) and not isfinite(value)
+    ]:
+        del walked[key]
+
     index = walked.pop("_index", None)
-    if not isinstance(index, (int, float)) or not 1 <= int(index) <= MAX_MODULES:
+    if (
+        not isinstance(index, (int, float))
+        or not isfinite(index)
+        or not 1 <= int(index) <= MAX_MODULES
+    ):
         return {}
 
     mos = [walked.pop(key) for key in _MOS_KEYS if key in walked]

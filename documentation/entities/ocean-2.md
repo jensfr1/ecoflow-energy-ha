@@ -12,7 +12,7 @@ Two serial prefixes, one device: `RE11` for the 10 kW unit and `RE17` for the 12
 
 Read-only. No write frame from an Ocean 2 has been observed, so there are no controls.
 
-Battery modules are read as well: 12 readings each, created once a module actually reports. The count is an installation choice - two on the unit this was mapped on, fourteen in a recording from another system - so nothing is declared for modules you do not have.
+Battery modules are read as well: 12 readings each, created once a module actually reports. The count is an installation choice - two on the unit this was mapped on - so nothing is declared for modules you do not have. Captures from other systems show bundles of up to fourteen per-module headers in one frame, a heartbeat backlog rather than fourteen distinct modules.
 
 **Despite the name, this is not a PowerOcean.** It carries its own telemetry frame on `cmd_func` 254 and shares no field layout with the `HJ31`/`J32x` line, which is why it has its own parser and its own entity set.
 
@@ -113,7 +113,7 @@ That is low for a home battery, which is why the field was overlooked at first. 
 
 ### The temperatures were separated by a load test, not by their averages
 
-45 minutes of wallbox charging at up to 3.6 kW per module. What tells the readings apart is how they move. Three of them hold the order min ≤ average ≤ max in every frame and rise together and slowly - those are the cells. Four others follow the load within a minute, swinging 11 to 17 K at up to 7 K per minute, which is power electronics rather than cells. Those four sit on different parts of the same board; the integration publishes the hottest as one reading, because four near-identical entities per module would be noise at fourteen modules.
+45 minutes of wallbox charging at up to 3.6 kW per module. What tells the readings apart is how they move. Three of them hold the order min ≤ average ≤ max in every frame and rise together and slowly - those are the cells. Four others follow the load within a minute, swinging 11 to 17 K at up to 7 K per minute, which is power electronics rather than cells. Those four sit on different parts of the same board; the integration publishes the hottest as one reading, because four near-identical entities per module would be noise at sixteen modules.
 
 ### What is not mapped yet
 

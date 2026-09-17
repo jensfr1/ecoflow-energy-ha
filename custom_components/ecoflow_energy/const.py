@@ -10,6 +10,12 @@ from typing import Any, Literal, Protocol
 
 from homeassistant.const import Platform
 
+# Four names below (DEVICE_TYPE_UNKNOWN, device_log_tag, get_device_name,
+# get_device_type) are re-exported for callers that import them from this
+# top-level const module (e.g. coordinator/core.py, config_flow_setup.py)
+# rather than from .ecoflow.const directly. They are unused in this file's
+# own body, hence the per-line noqa instead of deleting them - and no
+# __all__ (that would change what `import *` exposes from this module).
 from .ecoflow.const import (  # noqa: E402
     DEVICE_TYPE_DELTA,
     DEVICE_TYPE_DELTA3,
@@ -31,13 +37,6 @@ from .ecoflow.const import (  # noqa: E402
     get_device_name,  # noqa: F401
     get_device_type,  # noqa: F401
 )
-
-# Four names below (DEVICE_TYPE_UNKNOWN, device_log_tag, get_device_name,
-# get_device_type) are re-exported for callers that import them from this
-# top-level const module (e.g. coordinator/core.py, config_flow_setup.py)
-# rather than from .ecoflow.const directly. They are unused in this file's
-# own body, hence the per-line noqa instead of deleting them - and no
-# __all__ (that would change what `import *` exposes from this module).
 from .ecoflow.parsers.ocean2_proto import (
     MAX_MODULES as OCEAN2_MAX_MODULES,  # noqa: E402
 )
@@ -7203,11 +7202,13 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
 
     Every one of these is an accessory: created once the module has actually
     reported, never before. The module count is an installation choice rather
-    than a model difference - two on the unit this was mapped on, thirteen and
-    fourteen in recordings from other systems - so declaring a fixed number as
-    disabled-by-default would leave most owners with dozens of entities their
-    hardware can never fill, and the rest hunting through a disabled list for
-    the modules they do have.
+    than a model difference - two on the unit this was mapped on; captures
+    from other systems show bundles of up to fourteen per-module headers in
+    one frame, which is a heartbeat backlog rather than fourteen distinct
+    modules (see the parser's own note on this). Declaring a fixed number as
+    disabled-by-default would still leave most owners with dozens of entities
+    their hardware can never fill, and the rest hunting through a disabled
+    list for the modules they do have.
     """
     m = f"module{module_num}"
     n = module_num
@@ -7215,7 +7216,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
     core = [
         # No battery device class: Home Assistant shows one battery figure per
         # device, and that is the system state of charge. A per-module class
-        # would put fourteen competing battery icons on one device.
+        # would put sixteen competing battery icons on one device.
         EcoFlowSensorDef(
             f"{m}_soc_pct",
             f"Module {n} SoC",
@@ -7225,6 +7226,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             "mdi:battery",
             suggested_display_precision=1,
             accessory=True,
+            enhanced_only=True,
         ),
         # Signed like the system reading: positive charges, negative discharges.
         EcoFlowSensorDef(
@@ -7236,6 +7238,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             "mdi:battery-charging",
             suggested_display_precision=0,
             accessory=True,
+            enhanced_only=True,
         ),
         # Energy left in this module, not its capacity.
         EcoFlowSensorDef(
@@ -7247,6 +7250,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             "mdi:battery-70",
             suggested_display_precision=0,
             accessory=True,
+            enhanced_only=True,
         ),
         EcoFlowSensorDef(
             f"{m}_soh_pct",
@@ -7258,6 +7262,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             "diagnostic",
             suggested_display_precision=1,
             accessory=True,
+            enhanced_only=True,
         ),
         EcoFlowSensorDef(
             f"{m}_cycles",
@@ -7269,6 +7274,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             "diagnostic",
             suggested_display_precision=0,
             accessory=True,
+            enhanced_only=True,
         ),
     ]
 
@@ -7286,6 +7292,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             suggested_display_precision=1,
             disabled_by_default=True,
             accessory=True,
+            enhanced_only=True,
         ),
         EcoFlowSensorDef(
             f"{m}_cell_temp_min_c",
@@ -7298,6 +7305,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             suggested_display_precision=1,
             disabled_by_default=True,
             accessory=True,
+            enhanced_only=True,
         ),
         EcoFlowSensorDef(
             f"{m}_cell_temp_max_c",
@@ -7310,6 +7318,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             suggested_display_precision=1,
             disabled_by_default=True,
             accessory=True,
+            enhanced_only=True,
         ),
         # The hottest of the four power-electronics readings, see the parser.
         EcoFlowSensorDef(
@@ -7323,6 +7332,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             suggested_display_precision=1,
             disabled_by_default=True,
             accessory=True,
+            enhanced_only=True,
         ),
         # Pack voltage: low for a home battery because the modules are 5S.
         EcoFlowSensorDef(
@@ -7336,6 +7346,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             suggested_display_precision=2,
             disabled_by_default=True,
             accessory=True,
+            enhanced_only=True,
         ),
         EcoFlowSensorDef(
             f"{m}_current_a",
@@ -7348,6 +7359,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             suggested_display_precision=2,
             disabled_by_default=True,
             accessory=True,
+            enhanced_only=True,
         ),
         # Highest cell voltage, not the pack - it follows the load.
         EcoFlowSensorDef(
@@ -7361,6 +7373,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             suggested_display_precision=0,
             disabled_by_default=True,
             accessory=True,
+            enhanced_only=True,
         ),
     ]
 
