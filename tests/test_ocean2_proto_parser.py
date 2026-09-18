@@ -81,6 +81,12 @@ class TestDeviceClassification:
         # reads: same message families, same payload shape.
         assert get_device_type("", "RE17TEST00000001") == DEVICE_TYPE_OCEAN2
 
+    def test_the_plus_shares_the_read_path(self) -> None:
+        # An `RE41` diagnostics download on #145 carries the `RE11`'s field
+        # numbers throughout. Single phase changes only the per-phase block,
+        # which no entity here reads.
+        assert get_device_type("", "RE41TEST00000001") == DEVICE_TYPE_OCEAN2
+
     def test_the_prefix_beats_a_powerocean_product_name(self) -> None:
         # "PowerOcean" as a product name would otherwise claim the unit and
         # hand it to a parser that decodes none of its frames. The prefix is
@@ -96,6 +102,7 @@ class TestDeviceClassification:
         # The app API reports an empty product name for this device.
         assert get_device_name("", "RE11TEST00001234") == "Ocean 2 (1234)"
         assert get_device_name("", "RE17TEST00001234") == "Ocean 2 (1234)"
+        assert get_device_name("", "RE41TEST00001234") == "Ocean 2 Plus (1234)"
 
 
 class TestTelemetryFrame:
