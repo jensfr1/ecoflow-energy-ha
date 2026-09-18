@@ -47,9 +47,9 @@ Battery modules are read as well: 12 readings each, created once a module actual
 
 ## Sensors - Battery Modules (up to 16)
 
-Each module creates 12 sensors (5 core + 7 diagnostic). They are created once a module actually reports, so a system with two modules gets two sets and nothing else - the count is an installation choice, not a model difference.
+Each module creates 12 sensors (5 enabled by default, 7 disabled). They are created once a module actually reports, so a system with two modules gets two sets and nothing else - the count is an installation choice, not a model difference.
 
-**Core sensors per module:**
+**Enabled by default:**
 
 | Entity | Unit | Description |
 |:---|:---:|:---|
@@ -59,7 +59,7 @@ Each module creates 12 sensors (5 core + 7 diagnostic). They are created once a 
 | Module N State of Health | % | Ageing state, separate from the charge above |
 | Module N Charge Cycles | - | Full cycles the module counts |
 
-**Diagnostic sensors per module (all disabled):**
+**Disabled by default:**
 
 | Entity | Unit |
 |:---|:---:|

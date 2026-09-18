@@ -7269,7 +7269,7 @@ def _build_ocean2_module_sensors(module_num: int) -> list[EcoFlowSensorDef]:
             f"Module {n} Charge Cycles",
             None,
             None,
-            "measurement",
+            "total_increasing",
             "mdi:counter",
             "diagnostic",
             suggested_display_precision=0,

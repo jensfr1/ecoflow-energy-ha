@@ -29,8 +29,8 @@ unrelated installation: the numbers line up frame for frame, the load-bearing
 readings and the module block included.
 
 They come from https://github.com/jensfr1/ha-ecoflow-ocean2, a standalone
-Ocean 2 integration that decodes the full frame set - including the
-per-module battery data this parser leaves for a later change.
+Ocean 2 integration that decodes the full frame set, including the
+per-module battery data this parser reads below.
 
 Standard Mode is not an option for this device: the HTTP quota call answers
 error 1006 ("current device is not allowed to get device info"), the same

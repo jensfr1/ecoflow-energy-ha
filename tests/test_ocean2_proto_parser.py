@@ -419,6 +419,25 @@ class TestRealModuleFrames:
         "00f05445"
     )
 
+    # A `254/46` record captured while the module was actually discharging
+    # (~2.3 kW), not resting - the two frames above hit 0.0 W on field 1 and
+    # cannot verify the mapping, its scale or its sign, however real they
+    # are. Same 2026-09-07 RE11 recording, serial already masked in the
+    # capture on file.
+    MODULE_3 = (
+        "081e2ae8020d24230dc5105718642a1400000442000004420000004200000042000000"
+        "423500404c453d00104c4540014dec518241552b690bc35d86ce454465b8d80ac36800"
+        "721400404c4500304c4500204c4500104c4500204c4578018201105858585858585858"
+        "58585858585858588801229001009d0100009645a50100c08f45ad010000f041b50100"
+        "001c42bd0100002c42c50100003442cd0100003042d001ecb28c05d801b28f8e05e001"
+        "909513e801ee8f13f50100000442fd01000000428502000040428d0200003442900200"
+        "9802ffff03a00221a802efd6fad406b50265ddae42bd020000c842c00200c80205d002"
+        "64d80201e00200e80283d001f00201f802ab8284088003858084088803029003019803"
+        "01a0039901a8038402b50328138945bd03689eae42c50300000000cd0365ddae42d503"
+        "65ddae42dd035a2c783fe503b0a4c742ed0366aec742f00300f803008004008804d1fe"
+        "0a9004bdda0aa00402ad0400304c45"
+    )
+
     def test_decodes_a_real_frame(self) -> None:
         parsed = parse_ocean2_proto_message(
             _frame(bytes.fromhex(self.MODULE_1), cmd_id=46)
@@ -456,3 +475,25 @@ class TestRealModuleFrames:
         assert parsed["module1_soc_pct"] == pytest.approx(99.598, abs=0.01)
         assert parsed["module2_soc_pct"] == pytest.approx(99.608, abs=0.01)
         assert parsed["module1_voltage_v"] != parsed["module2_voltage_v"]
+
+    def test_the_power_reading_holds_up_while_the_module_is_loaded(self) -> None:
+        # MODULE_1 and MODULE_2 are both a resting pack (field 1 is 0.0 in
+        # both), which cannot verify a power mapping, its scale, or its sign
+        # - MODULE_3 is a real record from the same capture with the module
+        # under ~2.3 kW load.
+        parsed = parse_ocean2_proto_message(
+            _frame(bytes.fromhex(self.MODULE_3), cmd_id=46)
+        )
+        assert parsed is not None
+        power = parsed["module1_power_w"]
+        voltage = parsed["module1_voltage_v"]
+        current = parsed["module1_current_a"]
+
+        # V x I hits the reported power within 1%.
+        assert voltage * current == pytest.approx(power, rel=0.01)
+
+        # Signed like the system reading: positive charges, negative
+        # discharges. A negative current here (power flowing out of the
+        # module) has to land on a negative power.
+        assert current < 0
+        assert power < 0
